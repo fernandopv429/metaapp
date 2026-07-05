@@ -198,8 +198,10 @@ apiRouter.post('/compliance/data-deletion/:app_id', async (req, res) => {
       status_detail: `Processed data deletion request for user ${userId}`,
     });
 
+    const baseUrl = process.env.APP_URL || 'https://api.nexusdevhub.com';
+
     res.json({
-      url: `https://sua-api.nexus.com/v1/compliance/status?id=${confirmationCode}`,
+      url: `${baseUrl}/v1/compliance/status?id=${confirmationCode}`,
       confirmation_code: confirmationCode
     });
   } catch (err) {
