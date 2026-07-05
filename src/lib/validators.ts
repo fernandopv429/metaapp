@@ -1,12 +1,5 @@
 import { z } from 'zod';
 
-export const MetaAppSchema = z.object({
-  appId: z.string().min(1),
-  appName: z.string().min(1),
-  appSecret: z.string().min(1),
-  verifyToken: z.string().min(1),
-});
-
 export const MetaCredentialSchema = z.object({
   companyId: z.string().min(1),
   appId: z.string().min(1),

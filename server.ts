@@ -3,10 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import { db } from './src/db/database';
-import { metaApps, metaCredentials, whatsappTemplates } from './src/db/schema';
+import { metaCredentials, whatsappTemplates, clients } from './src/db/schema';
 import { logsManager } from './src/lib/logs_manager';
 import { decodeSignedRequest, verifySignature } from './src/lib/compliance_crypto';
-import { MetaAppSchema, MetaCredentialSchema, WhatsappTemplateSchema } from './src/lib/validators';
+import { MetaCredentialSchema, WhatsappTemplateSchema } from './src/lib/validators';
 import { eq } from 'drizzle-orm';
 
 const app = express();
@@ -31,18 +31,17 @@ const apiRouter = express.Router();
  * 1. Webhooks Multi-App e Multicanal
  */
 
-// GET /v1/webhooks/meta/:app_id (Handshake de Verificação)
-apiRouter.get('/webhooks/meta/:app_id', async (req, res) => {
-  const appId = req.params.app_id;
+// GET /v1/webhooks/meta (Handshake de Verificação)
+apiRouter.get('/webhooks/meta', async (req, res) => {
   const mode = req.query['hub.mode'] as string;
   const token = req.query['hub.verify_token'] as string;
   const challenge = req.query['hub.challenge'] as string;
 
   if (mode === 'subscribe' && token) {
     try {
-      const appRecord = await db.select().from(metaApps).where(eq(metaApps.appId, appId)).limit(1);
-      if (appRecord.length > 0 && appRecord[0].verifyToken === token) {
-        console.log(`[Handshake] Validated webhook for app ${appId}`);
+      const expectedToken = process.env.META_VERIFY_TOKEN;
+      if (expectedToken && expectedToken === token) {
+        console.log(`[Handshake] Validated webhook`);
         // Return challenge as plaintext
         res.status(200).send(challenge);
         return;
@@ -59,21 +58,20 @@ apiRouter.get('/webhooks/meta/:app_id', async (req, res) => {
   res.status(400).send('Bad Request');
 });
 
-// POST /v1/webhooks/meta/:app_id (Roteador Multicanal)
-apiRouter.post('/webhooks/meta/:app_id', async (req: any, res) => {
-  const appId = req.params.app_id;
+// POST /v1/webhooks/meta (Roteador Multicanal)
+apiRouter.post('/webhooks/meta', async (req: any, res) => {
   const signature = req.headers['x-hub-signature-256'] as string;
   const payload = req.body;
   const rawBody = req.rawBody;
 
   try {
-    const appRecord = await db.select().from(metaApps).where(eq(metaApps.appId, appId)).limit(1);
-    if (appRecord.length === 0) {
-      res.status(401).send('App not found');
+    const appSecret = process.env.META_APP_SECRET;
+    const appId = process.env.META_APP_ID || 'single-app';
+
+    if (!appSecret) {
+      res.status(500).send('App secret not configured');
       return;
     }
-
-    const appSecret = appRecord[0].appSecret;
 
     // 1. Validação de Assinatura Digital
     if (!verifySignature(rawBody, signature, appSecret)) {
@@ -165,9 +163,8 @@ apiRouter.post('/webhooks/meta/:app_id', async (req: any, res) => {
  * 2. Endpoints Obrigatórios de Compliance Jurídico (LGPD/GDPR da Meta)
  */
 
-// POST /v1/compliance/data-deletion/:app_id
-apiRouter.post('/compliance/data-deletion/:app_id', async (req, res) => {
-  const appId = req.params.app_id;
+// POST /v1/compliance/data-deletion
+apiRouter.post('/compliance/data-deletion', async (req, res) => {
   const signedRequest = req.body.signed_request;
 
   if (!signedRequest) {
@@ -176,13 +173,15 @@ apiRouter.post('/compliance/data-deletion/:app_id', async (req, res) => {
   }
 
   try {
-    const appRecord = await db.select().from(metaApps).where(eq(metaApps.appId, appId)).limit(1);
-    if (appRecord.length === 0) {
-      res.status(401).send('App not found');
+    const appSecret = process.env.META_APP_SECRET;
+    const appId = process.env.META_APP_ID || 'single-app';
+
+    if (!appSecret) {
+      res.status(500).send('App secret not configured');
       return;
     }
 
-    const data = decodeSignedRequest(signedRequest, appRecord[0].appSecret);
+    const data = decodeSignedRequest(signedRequest, appSecret);
     if (!data) {
       res.status(401).send('Invalid signed_request');
       return;
@@ -210,9 +209,8 @@ apiRouter.post('/compliance/data-deletion/:app_id', async (req, res) => {
   }
 });
 
-// POST /v1/compliance/deauthorize/:app_id
-apiRouter.post('/compliance/deauthorize/:app_id', async (req, res) => {
-  const appId = req.params.app_id;
+// POST /v1/compliance/deauthorize
+apiRouter.post('/compliance/deauthorize', async (req, res) => {
   const signedRequest = req.body.signed_request;
 
   if (!signedRequest) {
@@ -221,13 +219,15 @@ apiRouter.post('/compliance/deauthorize/:app_id', async (req, res) => {
   }
 
   try {
-    const appRecord = await db.select().from(metaApps).where(eq(metaApps.appId, appId)).limit(1);
-    if (appRecord.length === 0) {
-      res.status(401).send('App not found');
+    const appSecret = process.env.META_APP_SECRET;
+    const appId = process.env.META_APP_ID || 'single-app';
+
+    if (!appSecret) {
+      res.status(500).send('App secret not configured');
       return;
     }
 
-    const data = decodeSignedRequest(signedRequest, appRecord[0].appSecret);
+    const data = decodeSignedRequest(signedRequest, appSecret);
     if (!data) {
       res.status(401).send('Invalid signed_request');
       return;
@@ -260,28 +260,29 @@ apiRouter.get('/logs', (req, res) => {
   res.json(logsManager.getLogs());
 });
 
-// meta_apps
-apiRouter.get('/meta-apps', async (req, res) => {
+// clients
+apiRouter.get('/clients', async (req, res) => {
   try {
-    const apps = await db.select({
-      id: metaApps.id,
-      appId: metaApps.appId,
-      appName: metaApps.appName,
-      // hide appSecret
-      verifyToken: metaApps.verifyToken
-    }).from(metaApps);
-    res.json(apps);
+    const allClients = await db.select().from(clients);
+    res.json(allClients);
   } catch(e) { res.status(500).send(String(e)); }
 });
 
-apiRouter.post('/meta-apps', async (req, res) => {
+apiRouter.post('/clients', async (req, res) => {
   try {
-    const parsed = MetaAppSchema.parse(req.body);
-    const result = await db.insert(metaApps).values(parsed).returning();
+    if (!req.body.id || !req.body.name) return res.status(400).send("id and name required");
+    const result = await db.insert(clients).values({ id: req.body.id, name: req.body.name }).returning();
     res.json(result[0]);
   } catch (e: any) {
-    res.status(400).json({ error: e.errors || e.message });
+    res.status(400).json({ error: e.message });
   }
+});
+
+// Meta config
+apiRouter.get('/meta-config', (req, res) => {
+  res.json({
+    appId: process.env.META_APP_ID || ''
+  });
 });
 
 // meta_credentials

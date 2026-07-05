@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Activity, Database, Key, CheckCircle, XCircle } from 'lucide-react';
+import { Activity, Database, Key, CheckCircle, XCircle, Smartphone } from 'lucide-react';
+import EmbeddedSignup from './components/EmbeddedSignup';
+import ClientsView from './components/ClientsView';
+import TemplatesView from './components/TemplatesView';
 
 type LogEntry = {
   timestamp: string;
@@ -16,20 +19,49 @@ type MetaApp = {
   verifyToken: string;
 };
 
+type ClientEntry = {
+  id: string;
+  name: string;
+};
+
 export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [apps, setApps] = useState<MetaApp[]>([]);
-  const [activeTab, setActiveTab] = useState<'logs' | 'apps'>('logs');
+  const [clients, setClients] = useState<ClientEntry[]>([]);
+  const [currentClient, setCurrentClient] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'logs' | 'signup' | 'clients' | 'templates'>('clients');
   const [isLoading, setIsLoading] = useState(false);
+  const [metaAppId, setMetaAppId] = useState<string>('');
 
   useEffect(() => {
     fetchLogs();
-    fetchApps();
+    fetchClients();
+    fetchMetaConfig();
     
     // Poll logs every 5 seconds
     const interval = setInterval(fetchLogs, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchMetaConfig = async () => {
+    try {
+      const res = await fetch('/v1/meta-config');
+      if (res.ok) {
+        const data = await res.json();
+        setMetaAppId(data.appId);
+      }
+    } catch (e) {
+      console.error('Error fetching meta config', e);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await fetch('/v1/clients');
+      if (res.ok) setClients(await res.json());
+    } catch (e) {
+      console.error('Error fetching clients', e);
+    }
+  };
 
   const fetchLogs = async () => {
     try {
@@ -38,35 +70,6 @@ export default function App() {
     } catch (e) {
       console.error('Error fetching logs', e);
     }
-  };
-
-  const fetchApps = async () => {
-    try {
-      const res = await fetch('/v1/meta-apps');
-      if (res.ok) setApps(await res.json());
-    } catch (e) {
-      console.error('Error fetching apps', e);
-    }
-  };
-
-  const seedDemoApp = async () => {
-    setIsLoading(true);
-    try {
-      await fetch('/v1/meta-apps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appId: `APP_${Math.floor(Math.random() * 100000)}`,
-          appName: 'Nexus Multichannel Hub',
-          appSecret: 'test_secret_123',
-          verifyToken: 'nexus_secure_token'
-        })
-      });
-      fetchApps();
-    } catch (e) {
-      console.error(e);
-    }
-    setIsLoading(false);
   };
 
   return (
@@ -83,16 +86,28 @@ export default function App() {
           </div>
           <div className="flex bg-neutral-900 p-1 rounded-lg border border-neutral-800">
             <button 
+              onClick={() => setActiveTab('clients')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'clients' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'}`}
+            >
+              Clients (SaaS Users)
+            </button>
+            <button 
+              onClick={() => setActiveTab('signup')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'signup' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'}`}
+            >
+              Embedded Signup
+            </button>
+            <button 
+              onClick={() => setActiveTab('templates')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'templates' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'}`}
+            >
+              WhatsApp Templates
+            </button>
+            <button 
               onClick={() => setActiveTab('logs')}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'logs' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'}`}
             >
-              Volatile Logs
-            </button>
-            <button 
-              onClick={() => setActiveTab('apps')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'apps' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white'}`}
-            >
-              Meta Apps
+              Logs
             </button>
           </div>
         </header>
@@ -151,7 +166,8 @@ export default function App() {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 setIsLoading(true);
-                const formData = new FormData(e.currentTarget);
+                const form = e.currentTarget;
+                const formData = new FormData(form);
                 try {
                   await fetch('/v1/meta-apps', {
                     method: 'POST',
@@ -163,7 +179,7 @@ export default function App() {
                       verifyToken: formData.get('verifyToken')
                     })
                   });
-                  e.currentTarget.reset();
+                  form.reset();
                   fetchApps();
                 } catch (err) {
                   console.error(err);
@@ -206,6 +222,18 @@ export default function App() {
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'signup' && (
+            <EmbeddedSignup metaAppId={metaAppId} clients={clients} />
+          )}
+
+          {activeTab === 'clients' && (
+            <ClientsView clients={clients} fetchClients={fetchClients} />
+          )}
+
+          {activeTab === 'templates' && (
+            <TemplatesView clients={clients} />
           )}
         </main>
       </div>
