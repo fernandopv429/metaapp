@@ -7,6 +7,9 @@ WORKDIR /app
 # Otimização de Cache do Docker (Copia package.json e package-lock.json primeiro)
 COPY package*.json ./
 
+# Instalação do curl para o Healthcheck do Coolify
+RUN apk add --no-cache curl
+
 # Instalação apenas de dependências essenciais
 RUN npm ci
 
