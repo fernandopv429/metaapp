@@ -1,32 +1,23 @@
-# Imagem oficial leve otimizada para produção
-FROM python:3.11-slim
-
-# Configurações de ambiente Python para otimização e logs em tempo real
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Instalação de dependências do SO necessárias para compilação (asyncpg/psycopg)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Imagem oficial leve otimizada para produção Node.js
+FROM node:22-alpine
 
 # Definição do diretório de trabalho
 WORKDIR /app
 
-# Otimização de Cache do Docker (Copia apenas os requirements primeiro)
-COPY requirements.txt .
+# Otimização de Cache do Docker (Copia package.json e package-lock.json primeiro)
+COPY package*.json ./
 
-# Instalação das dependências Python
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Instalação apenas de dependências essenciais
+RUN npm ci
 
 # Cópia do restante do código-fonte para o container
 COPY . .
 
-# Exposição explícita da porta interna exigida pelo Coolify/FastAPI
-EXPOSE 8000
+# Build da aplicação Express/Vite (Produção)
+RUN npm run build
 
-# Execução do Uvicorn escutando em 0.0.0.0 (Mandatório para o Proxy Reverso)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Exposição explícita da porta interna exigida pelo Coolify
+EXPOSE 3000
+
+# Execução do Node.js escutando em 0.0.0.0
+CMD ["npm", "start"]
