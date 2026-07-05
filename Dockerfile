@@ -1,26 +1,25 @@
-# Imagem oficial leve otimizada para produção Node.js
-FROM node:22-alpine
+FROM node:20-slim AS builder
 
-# Definição do diretório de trabalho
 WORKDIR /app
 
-# Otimização de Cache do Docker (Copia package.json e package-lock.json primeiro)
 COPY package*.json ./
-
-# Instalação do curl para o Healthcheck do Coolify
-RUN apk add --no-cache curl
-
-# Instalação apenas de dependências essenciais
 RUN npm ci
 
-# Cópia do restante do código-fonte para o container
 COPY . .
-
-# Build da aplicação Express/Vite (Produção)
 RUN npm run build
 
-# Exposição explícita da porta interna exigida pelo Coolify
-EXPOSE 3000
+FROM node:20-slim
 
-# Execução do Node.js escutando em 0.0.0.0
-CMD ["npm", "start"]
+WORKDIR /app
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist ./dist
+
+# Install only production dependencies for the node server
+RUN npm ci --omit=dev
+
+ENV NODE_ENV=production
+ENV PORT=8000
+EXPOSE 8000
+
+CMD ["node", "dist/server.cjs"]

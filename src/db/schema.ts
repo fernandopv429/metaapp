@@ -5,6 +5,15 @@ export const clients = pgTable('clients', {
   name: varchar('name', { length: 255 }).notNull(),
 });
 
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  role: varchar('role', { length: 50 }).notNull().default('client'), // 'admin' or 'client'
+  companyId: varchar('company_id', { length: 255 }), // if role is client, this is their company ID
+});
+
+
 export const metaCredentials = pgTable('meta_credentials', {
   id: serial('id').primaryKey(),
   companyId: varchar('company_id', { length: 255 }).notNull().unique(),

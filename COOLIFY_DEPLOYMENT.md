@@ -1,46 +1,45 @@
-# Nexus Platform: Guia de Deploy no Coolify
+# Guia de Provisionamento e Deployment - Nexus Meta Hub no Coolify
 
-Este guia orienta o provisionamento do **Proxy Hub Multi-Tenant (Nexus Platform)** no painel do Coolify, atendendo a todos os critérios de resiliência e auditoria da Meta.
+Este guia descreve os passos exatos para realizar o deploy do Nexus Meta Hub utilizando o Coolify como orquestrador e Traefik como proxy reverso, em conformidade com as exigências de arquitetura (porta 8000).
 
----
+## 1. Conexão do Repositório e Build Pack
 
-## 1. Conexão do Repositório e Configuração Inicial
-No painel do Coolify:
-1. Acesse **Projects** > Adicione ou escolha um projeto > **New Resource**.
-2. Selecione **Public Repository** (ou Private, se o repositório for privado).
-3. Insira a URL do repositório Git.
-4. Em **Build Pack**, selecione a opção **Dockerfile**. (O sistema irá ler automaticamente nosso `Dockerfile` otimizado, que inclui cache de pacotes, build do Vite/esbuild e Alpine Node.js).
+1. No painel do Coolify, navegue até **Projects** > Selecione ou crie um projeto > **Add New Resource**.
+2. Escolha **Git Repository** (Public ou Private, conforme sua hospedagem no GitHub/GitLab).
+3. Selecione o branch principal (ex: `main` ou `master`).
+4. Em **Build Pack**, selecione **Nixpacks** ou **Dockerfile**.
+   - Como incluímos um `Dockerfile` otimizado multistage na raiz do projeto, o Coolify detectará automaticamente e utilizará o Build Pack "Docker".
+   - Certifique-se de que o **Build Command** esteja vazio, pois o Dockerfile já se encarrega de realizar o build (`npm run build`).
 
----
+## 2. Configuração de Domínio e HTTPS Nativo
 
-## 2. Configuração de Rede e Domínio (Obrigatório para Meta)
-A Meta exige conexões seguras por HTTPS para registro de Webhooks e Embedded Signup.
-1. No menu de configurações da aplicação no Coolify, vá em **Domains**.
-2. Adicione seu domínio configurado (ex: `https://api.nexusdevhub.com`).
-3. O Coolify lidará automaticamente com o proxy reverso Traefik/Caddy e emitirá o certificado SSL (Let's Encrypt).
-4. Certifique-se de que a porta interna (**Port**) do container esteja exposta como `3000`. (Isso já está pré-configurado no nosso Dockerfile com a diretiva `EXPOSE 3000`).
+A Graph API e os Webhooks da Meta **exigem** conexões HTTPS seguras.
 
----
+1. Na aba **Configuration** do serviço recém-criado, procure a seção **Domains**.
+2. Insira o domínio ou subdomínio de produção para o seu Hub (ex: `https://api.nexusdevhub.com`).
+3. O Coolify (com o Traefik) gerará automaticamente os certificados SSL via Let's Encrypt para o domínio, resolvendo a exigência de HTTPS da Meta sem necessidade de configuração adicional no contêiner Node.js.
 
-## 3. Variáveis de Ambiente (Segurança)
-Na aba **Environment Variables** do Coolify, adicione as variáveis críticas. Não coloque aspas no valor.
+## 3. Variáveis de Ambiente Críticas
 
-* `DATABASE_URL`: String de conexão do seu banco de dados PostgreSQL (ex: `postgres://user:pass@host:5432/db`). Use um banco de dados relacional isolado.
-* `APP_URL`: URL base da sua aplicação usada para callbacks de exclusão de dados da Meta (ex: `https://api.nexusdevhub.com`).
-* `NODE_ENV`: Defina como `production`.
+Para o funcionamento correto do roteador multicanal e segurança de Webhooks (validação HMAC e LGPD), navegue até a aba **Environment Variables** e insira:
 
----
+- `DATABASE_URL`: String de conexão com seu banco PostgreSQL (`postgres://user:password@host:port/dbname`). Importante: o arquivo do Prisma/Drizzle já conta com opções de verificação de vida útil do pool.
+- `META_APP_SECRET`: Chave secreta do seu Meta App central, utilizada para assinar webhooks e requisições de deleção de dados (X-Hub-Signature-256).
+- `META_VERIFY_TOKEN`: Token personalizado estático que você configurou no painel da Meta para validação inicial de webhooks.
+- `META_APP_ID`: O ID principal do seu aplicativo da Meta.
+- `APP_URL`: O domínio público da aplicação configurado no passo 2, usado para retornar a URL de status nas exclusões de dados.
+- `PORT`: Deixe como padrão `8000` ou omita, já que o Dockerfile padronizou esta porta na variável de ambiente interna.
 
-## 4. Monitoramento e Resiliência (Healthchecks)
-Para evitar desligamento forçado ou que o proxy perca pacotes:
-1. Vá até a seção **Healthchecks** (se suportado diretamente pelo Coolify/Docker Compose gerado).
-2. O servidor expõe endpoints base para isso. Por se tratar de um roteador da Meta de missão crítica, garanta que o Traefik/Proxy redirecione tráfego contínuo.
-3. Defina a política de restart como `always` ou `unless-stopped`.
+## 4. Configuração de Rede (Exposing the Port)
 
----
+1. Na aba **Configuration**, verifique a porta exposta.
+2. Certifique-se de que o campo **Ports Exposes** esteja configurado como `8000`. O contêiner é inicializado internamente para escutar na interface `0.0.0.0` e responderá na porta 8000.
+3. O proxy reverso do Coolify encaminhará o tráfego da porta 443 (HTTPS) para a 8000 (interna).
 
-## 5. Deployment e Validação
-1. Clique em **Deploy** no Coolify.
-2. Acompanhe os logs. O build criará a pasta `dist/` com o front-end minificado (Dashboard) e o servidor em `dist/server.cjs`.
-3. Verifique a URL do dashboard no navegador para acessar as configurações de "SaaS Clients", "System Config" (Meta Apps) e visualizar os "Volatile Logs".
-4. Cadastre o App Central no Dashboard Nexus na aba **System Config**, pegue a URL gerada (ex: `https://api.nexusdevhub.com/v1/webhooks/meta/SEU_APP_ID`) e insira no painel da Meta para validação com o Verify Token criado.
+## 5. Healthcheck e Monitoramento
+
+1. Acesse as opções avançadas (Advanced) na configuração do serviço.
+2. Adicione ou verifique as configurações de **Healthcheck**.
+3. Aponte o Path do Healthcheck para `/v1/meta-config` ou para a raiz `/`. Isso garantirá que o Traefik envie tráfego apenas quando a API assíncrona Express estiver pronta para atender.
+
+Após salvar todas as configurações, clique em **Deploy** ou **Force Rebuild**. O Coolify fará a construção da imagem a partir do `Dockerfile` slim e iniciará o container rodando no ecossistema de produção.
