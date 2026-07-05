@@ -145,14 +145,42 @@ export default function App() {
                 <h2 className="text-xl font-medium text-white flex items-center gap-2">
                   <Key className="w-5 h-5 text-amber-400" /> Registered Meta Apps
                 </h2>
-                <button 
-                  onClick={seedDemoApp}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
-                >
-                  {isLoading ? 'Registering...' : '+ Register Demo App'}
-                </button>
               </div>
+
+              {/* Form to add real Meta Apps */}
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                const formData = new FormData(e.currentTarget);
+                try {
+                  await fetch('/v1/meta-apps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      appId: formData.get('appId'),
+                      appName: formData.get('appName'),
+                      appSecret: formData.get('appSecret'),
+                      verifyToken: formData.get('verifyToken')
+                    })
+                  });
+                  e.currentTarget.reset();
+                  fetchApps();
+                } catch (err) {
+                  console.error(err);
+                }
+                setIsLoading(false);
+              }} className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
+                <h3 className="text-sm font-medium text-neutral-300 border-b border-neutral-800 pb-2">Register New App</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input required name="appId" placeholder="App ID (ex: 1713999679641278)" className="bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                  <input required name="appName" placeholder="App Name (ex: Nexus Production)" className="bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                  <input required name="appSecret" type="password" placeholder="App Secret (from Meta)" className="bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                  <input required name="verifyToken" placeholder="Verify Token (create one here)" className="bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                </div>
+                <button disabled={isLoading} type="submit" className="w-full py-2 bg-amber-500 text-black text-sm font-medium rounded-lg hover:bg-amber-400 transition-colors">
+                  {isLoading ? 'Saving...' : 'Save Meta App to Database'}
+                </button>
+              </form>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {apps.length === 0 ? (
