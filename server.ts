@@ -124,6 +124,7 @@ apiRouter.get('/webhooks/meta', async (req, res) => {
   if (mode === 'subscribe' && token) {
     try {
       const expectedToken = process.env.META_VERIFY_TOKEN;
+      console.log('Received token:', token, 'Expected:', expectedToken);
       if (expectedToken && expectedToken === token) {
         console.log(`[Handshake] Validated webhook`);
         // Return challenge as plaintext
