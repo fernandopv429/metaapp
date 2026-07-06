@@ -72,8 +72,8 @@ export default function EmbeddedSignup({ metaAppId, clients, user }: { metaAppId
         scope: 'business_management,whatsapp_business_management,whatsapp_business_messaging',
         extras: {
           feature: 'whatsapp_embedded_signup',
-          version: 2,
-          sessionInfoVersion: 2,
+          version: 4,
+          sessionInfoVersion: 3,
         }
       }
     );

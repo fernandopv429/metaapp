@@ -9,7 +9,14 @@ export function verifySignature(payload: string | Buffer, signatureHeader: strin
     .createHmac('sha256', appSecret)
     .update(payload)
     .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  const signatureBuffer = Buffer.from(signature);
+  const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+  if (signatureBuffer.length !== expectedSignatureBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer);
 }
 
 export function decodeSignedRequest(signedRequest: string, appSecret: string): any {
@@ -26,7 +33,7 @@ export function decodeSignedRequest(signedRequest: string, appSecret: string): a
       .update(payload)
       .digest();
 
-    if (!crypto.timingSafeEqual(sig, expectedSig)) {
+    if (sig.length !== expectedSig.length || !crypto.timingSafeEqual(sig, expectedSig)) {
       throw new Error('Invalid signed_request signature');
     }
 
