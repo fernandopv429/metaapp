@@ -1,11 +1,13 @@
+#!/bin/bash
+cat << 'INNER_EOF' > src/components/TemplatesView.tsx
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from "../lib/api";
+import { useAuth } from '../context/AuthContext';
 import { LayoutTemplate, Plus, Check, RefreshCw, Smartphone, Key, Tag } from 'lucide-react';
 
-export default function TemplatesView({ clients: propClients, user }: { clients: any[], user: any }) {
-  
+export default function TemplatesView() {
+  const { user, apiFetch } = useAuth();
   const [templates, setTemplates] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>(propClients || []);
+  const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [showCreate, setShowCreate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -488,3 +490,6 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
     </div>
   );
 }
+INNER_EOF
+chmod +x rebuild_templates.sh
+./rebuild_templates.sh

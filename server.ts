@@ -186,12 +186,14 @@ apiRouter.post('/webhooks/meta', async (req: any, res) => {
 
     // 2. Analisar estrutura do JSON recebido de forma flexível (Payload Schema Fallback)
     let targetId: string | null = null;
+    let phoneNumberId: string | null = null;
     let sourceType: 'whatsapp' | 'instagram_messenger' | null = null;
     let messageId: string | null = null;
 
     if (payload?.object === 'whatsapp_business_account') {
       const entry = payload.entry?.[0];
       targetId = entry?.id;
+      phoneNumberId = entry?.changes?.[0]?.value?.metadata?.phone_number_id || null;
       sourceType = 'whatsapp';
       payload.nexus_source = 'whatsapp';
       
@@ -204,6 +206,7 @@ apiRouter.post('/webhooks/meta', async (req: any, res) => {
     } else if (payload?.object === 'page' || payload?.object === 'instagram') {
       const entry = payload.entry?.[0];
       targetId = entry?.id;
+      phoneNumberId = entry?.changes?.[0]?.value?.metadata?.phone_number_id || null;
       sourceType = 'instagram_messenger';
       payload.nexus_source = 'instagram_messenger';
       
@@ -231,7 +234,7 @@ apiRouter.post('/webhooks/meta', async (req: any, res) => {
       const credentials = await db.select().from(metaCredentials)
         .where(
           sourceType === 'whatsapp' 
-            ? eq(metaCredentials.wabaId, targetId)
+            ? eq(metaCredentials.phoneNumberId, phoneNumberId || targetId)
             : eq(metaCredentials.pageId, targetId)
         ).limit(1);
 
@@ -403,18 +406,24 @@ apiRouter.post('/test/whatsapp/send', requireAuth, async (req: any, res: any) =>
     }
     
     // Fetch credentials
-    const creds = await db.select().from(metaCredentials).where(eq(metaCredentials.companyId, company_id));
-    if (!creds.length) {
-      res.status(404).json({ error: 'Company not found or credentials missing' });
-      return;
-    }
     
-    const { wabaId } = creds[0]; const systemUserToken = decryptToken(creds[0].systemUserToken);
+    const creds = await db.select().from(metaCredentials).where(eq(metaCredentials.companyId, company_id));
+
+    
+    
+    
+
+    
+    
+    const phoneNumberId = process.env.META_PHONE_NUMBER_ID || creds[0]?.phoneNumberId || creds[0]?.wabaId;
+    const wabaId = process.env.META_WABA_ID || creds[0]?.wabaId;
+    const systemUserToken = process.env.META_SYSTEM_USER_TOKEN || (creds[0]?.systemUserToken ? decryptToken(creds[0].systemUserToken) : null);
     
     if (!wabaId || !systemUserToken) {
       res.status(400).json({ error: 'Missing WABA ID or Token for this company' });
       return;
     }
+
 
     const payload = {
       messaging_product: 'whatsapp',
@@ -426,7 +435,7 @@ apiRouter.post('/test/whatsapp/send', requireAuth, async (req: any, res: any) =>
       }
     };
     
-    const response = await fetchWithMetaBackoff(`https://graph.facebook.com/v20.0/${wabaId}/messages`, {
+    const response = await fetchWithMetaBackoff(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${systemUserToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -684,7 +693,15 @@ apiRouter.post('/meta-credentials', requireAuth, async (req: any, res: any) => {
     if (payloadToInsert.systemUserToken) {
        payloadToInsert.systemUserToken = encryptToken(payloadToInsert.systemUserToken);
     }
-    const result = await db.insert(metaCredentials).values(payloadToInsert).returning();
+    
+    let result;
+    const existing = await db.select().from(metaCredentials).where(eq(metaCredentials.companyId, parsed.companyId));
+    if (existing.length > 0) {
+      result = await db.update(metaCredentials).set(payloadToInsert).where(eq(metaCredentials.companyId, parsed.companyId)).returning();
+    } else {
+      result = await db.insert(metaCredentials).values(payloadToInsert).returning();
+    }
+
     if (result[0] && result[0].systemUserToken) {
        result[0].systemUserToken = decryptToken(result[0].systemUserToken);
     }
@@ -722,11 +739,16 @@ apiRouter.post('/templates', requireAuth, async (req: any, res: any) => {
 
     // Fetch WABA credentials
     const creds = await db.select().from(metaCredentials).where(eq(metaCredentials.companyId, parsed.companyId));
-    if (!creds.length || !creds[0].wabaId || !creds[0].systemUserToken) {
+    
+    const wabaId = process.env.META_WABA_ID || creds[0]?.wabaId;
+    const systemUserToken = process.env.META_SYSTEM_USER_TOKEN || (creds[0]?.systemUserToken ? decryptToken(creds[0].systemUserToken) : null);
+    if (!wabaId || !systemUserToken) {
        return res.status(400).json({ error: 'Missing Meta credentials (WABA ID or Token)' });
     }
 
-    const { wabaId } = creds[0]; const systemUserToken = decryptToken(creds[0].systemUserToken);
+    
+    
+
     
     // Create template via Meta Graph API
     const metaPayload = {
@@ -767,11 +789,16 @@ apiRouter.post('/templates/sync', requireAuth, async (req: any, res: any) => {
     }
 
     const creds = await db.select().from(metaCredentials).where(eq(metaCredentials.companyId, companyId));
-    if (!creds.length || !creds[0].wabaId || !creds[0].systemUserToken) {
+    
+    const wabaId = process.env.META_WABA_ID || creds[0]?.wabaId;
+    const systemUserToken = process.env.META_SYSTEM_USER_TOKEN || (creds[0]?.systemUserToken ? decryptToken(creds[0].systemUserToken) : null);
+    if (!wabaId || !systemUserToken) {
        return res.status(400).json({ error: 'Missing Meta credentials (WABA ID or Token)' });
     }
     
-    const { wabaId } = creds[0]; const systemUserToken = decryptToken(creds[0].systemUserToken);
+    
+    
+
 
     const response = await fetchWithMetaBackoff(`https://graph.facebook.com/v20.0/${wabaId}/message_templates`, {
       headers: { 'Authorization': `Bearer ${systemUserToken}` }
@@ -808,7 +835,7 @@ import { createServer as createViteServer } from 'vite';
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
     });
     app.use(vite.middlewares);

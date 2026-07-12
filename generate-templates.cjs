@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { apiFetch } from "../lib/api";
+const fs = require('fs');
+
+const content = `import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { LayoutTemplate, Plus, Check, RefreshCw, Smartphone, Key, Tag } from 'lucide-react';
 
-export default function TemplatesView({ clients: propClients, user }: { clients: any[], user: any }) {
-  
+export default function TemplatesView() {
+  const { user, apiFetch } = useAuth();
   const [templates, setTemplates] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>(propClients || []);
+  const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [showCreate, setShowCreate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +58,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
 
   const fetchTemplates = async () => {
     try {
-      const res = await apiFetch(`/v1/templates?company_id=${selectedClient}`);
+      const res = await apiFetch(\`/v1/templates?company_id=\${selectedClient}\`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setTemplates(data);
@@ -193,7 +195,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
             disabled={!selectedClient || isLoading}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Sincronizar
+            <RefreshCw className={\`w-4 h-4 \${isLoading ? 'animate-spin' : ''}\`} /> Sincronizar
           </button>
           <button 
             onClick={() => setShowCreate(!showCreate)}
@@ -239,7 +241,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
                         key={cat}
                         type="button"
                         onClick={() => setCategory(cat)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-colors ${category === cat ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={\`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-colors \${category === cat ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}\`}
                       >
                         {cat === 'MARKETING' && <Tag className="w-4 h-4" />}
                         {cat === 'UTILITY' && <LayoutTemplate className="w-4 h-4" />}
@@ -252,21 +254,21 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
                   {/* Subtypes */}
                   {category !== 'AUTHENTICATION' && (
                     <div className="space-y-3 mb-6">
-                      <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${subType === 'STANDARD' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <label className={\`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors \${subType === 'STANDARD' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}\`}>
                         <input type="radio" checked={subType === 'STANDARD'} onChange={() => setSubType('STANDARD')} className="mt-1" />
                         <div>
                           <div className="font-semibold text-slate-900">Padrão</div>
                           <div className="text-sm text-slate-500">Envie mensagens com mídia e botões personalizados para engajar seus clientes.</div>
                         </div>
                       </label>
-                      <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors opacity-60`}>
+                      <label className={\`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors opacity-60\`}>
                         <input type="radio" disabled className="mt-1" />
                         <div>
                           <div className="font-semibold text-slate-900">Catálogo</div>
                           <div className="text-sm text-slate-500">Envie mensagens para aumentar as vendas conectando seu catálogo de produtos.</div>
                         </div>
                       </label>
-                      <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors opacity-60`}>
+                      <label className={\`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors opacity-60\`}>
                         <input type="radio" disabled className="mt-1" />
                         <div>
                           <div className="font-semibold text-slate-900">Flows</div>
@@ -279,14 +281,14 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
                   {category === 'AUTHENTICATION' && (
                     <div className="space-y-3 mb-6">
                       <h4 className="font-semibold text-slate-900 text-sm mb-2">Configuração de entrega do código</h4>
-                      <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${authType === 'ZERO_TAP' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <label className={\`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors \${authType === 'ZERO_TAP' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}\`}>
                         <input type="radio" checked={authType === 'ZERO_TAP'} onChange={() => setAuthType('ZERO_TAP')} className="mt-1" />
                         <div>
                           <div className="font-semibold text-slate-900">Preenchimento automático de zero toque</div>
                           <div className="text-sm text-slate-500">O toque zero enviará o código automaticamente sem exigir que seu cliente toque em um botão.</div>
                         </div>
                       </label>
-                      <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${authType === 'COPY_CODE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <label className={\`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors \${authType === 'COPY_CODE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}\`}>
                         <input type="radio" checked={authType === 'COPY_CODE'} onChange={() => setAuthType('COPY_CODE')} className="mt-1" />
                         <div>
                           <div className="font-semibold text-slate-900">Copiar código</div>
@@ -456,7 +458,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
                   <div>
                     <h3 className="font-bold text-slate-900">{tpl.templateName}</h3>
                     <div className="flex gap-2 text-xs mt-2">
-                      <span className={`px-2.5 py-1 rounded-md font-medium ${tpl.category === 'MARKETING' ? 'bg-purple-100 text-purple-700' : tpl.category === 'UTILITY' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                      <span className={\`px-2.5 py-1 rounded-md font-medium \${tpl.category === 'MARKETING' ? 'bg-purple-100 text-purple-700' : tpl.category === 'UTILITY' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}\`}>
                         {tpl.category}
                       </span>
                       <span className="bg-slate-100 px-2.5 py-1 rounded-md text-slate-600 font-medium">{tpl.language}</span>
@@ -475,7 +477,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
                     ))}
                   </div>
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className={`text-xs px-3 py-1 rounded-full font-semibold ${tpl.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : tpl.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={\`text-xs px-3 py-1 rounded-full font-semibold \${tpl.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : tpl.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}\`}>
                       {tpl.status}
                     </span>
                   </div>
@@ -487,4 +489,7 @@ export default function TemplatesView({ clients: propClients, user }: { clients:
       )}
     </div>
   );
-}
+`;
+
+fs.writeFileSync('src/components/TemplatesView.tsx', content);
+console.log('TemplatesView.tsx has been regenerated securely.');

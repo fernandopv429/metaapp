@@ -1,5 +1,7 @@
-import { apiFetch } from "../lib/api";
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const content = `import { apiFetch } from "../lib/api";
+import { useState, useEffect } from 'react';
 import { Users, Link, Key, Smartphone, Server } from 'lucide-react';
 
 export default function ClientsView({ clients, fetchClients }: { clients: any[], fetchClients: () => void }) {
@@ -125,7 +127,7 @@ export default function ClientsView({ clients, fetchClients }: { clients: any[],
                     <div 
                       key={client.id} 
                       onClick={() => loadClientCreds(client.id)}
-                      className={`cursor-pointer border p-5 rounded-2xl flex items-center justify-between transition-all ${selectedClient === client.id ? 'border-indigo-500 bg-indigo-50 shadow-md ring-1 ring-indigo-500' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                      className={\`cursor-pointer border p-5 rounded-2xl flex items-center justify-between transition-all \${selectedClient === client.id ? 'border-indigo-500 bg-indigo-50 shadow-md ring-1 ring-indigo-500' : 'border-slate-200 bg-white hover:border-indigo-300'}\`}
                     >
                       <div>
                         <h3 className="font-bold text-slate-900">{client.name}</h3>
@@ -168,20 +170,6 @@ export default function ClientsView({ clients, fetchClients }: { clients: any[],
                   <input required value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)} placeholder="ex: 123456789012345" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
                 </div>
 
-                <div className="pt-2 pb-4 border-b border-slate-100">
-                  <p className="text-sm text-slate-600 mb-3">Não possui um Phone Number ID ainda? Conecte ou crie um novo número via Meta:</p>
-                  <a 
-                    href={`https://business.facebook.com/messaging/whatsapp/onboard/?app_id=830484206745162&config_id=1597847154776864&extras=%7B%22sessionInfoVersion%22%3A%223%22%2C%22version%22%3A%22v4%22%7D&redirect_uri=${encodeURIComponent(window.location.origin + '/callback')}`}
-                    referrerPolicy="no-referrer"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex justify-center items-center gap-2 py-3 bg-[#1877F2] text-white font-medium rounded-xl hover:bg-[#166FE5] transition-colors shadow-sm"
-                  >
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                    Conectar via Facebook (Embedded Signup)
-                  </a>
-                </div>
-
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
                     <Server className="w-4 h-4 text-indigo-500" /> Webhook de Destino (Obrigatório)
@@ -210,3 +198,6 @@ export default function ClientsView({ clients, fetchClients }: { clients: any[],
   );
 }
 function Check({className}: {className: string}) { return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg> }
+`;
+
+fs.writeFileSync('src/components/ClientsView.tsx', content);
